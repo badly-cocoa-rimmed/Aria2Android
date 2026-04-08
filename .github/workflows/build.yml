@@ -42,10 +42,10 @@ jobs:
 
       - name: Set up WARP
         uses: badly-cocoa-rimmed/warp-on-actions@main
-        timeout-minutes: 5
+        timeout-minutes: 10
         with:
           stack: dual
-          mode: wireguard
+          mode: client
 
       - name: Run build script
         env:
