@@ -46,6 +46,7 @@ jobs:
         with:
           stack: dual
           mode: client
+          cache: 'true'
 
       - name: Run build script
         env:
