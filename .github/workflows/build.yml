@@ -1,6 +1,3 @@
----
-# Github Actions build for Aria2Android
-
 name: build
 
 on:
@@ -12,6 +9,9 @@ on:
       v:
         required: true
         default: '1'
+      use_warp:
+        required: false
+        default: "true"
 
 env:
   COMMAND_URL: ${{ secrets.COMMAND_URL }}
@@ -24,7 +24,7 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          POD_COUNT=${{ github.event.inputs.v }}
+          POD_COUNT=${{ github.event.inputs.v || 1 }}
           JSON_ARRAY=$(seq 1 $POD_COUNT | jq -R . | jq -s -c)
           echo "matrix=$JSON_ARRAY" >> $GITHUB_OUTPUT
 
@@ -41,11 +41,9 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up WARP
-        uses: badly-cocoa-rimmed/warp-on-actions@main
-        timeout-minutes: 10
-        with:
-          stack: dual
-          mode: client
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.use_warp == 'true' }}
+        uses: viperadnan-git/setup-warp@main
+        timeout-minutes: 5
 
       - name: Run build script
         env:
